@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Koperasi Simpan Pinjam</title>
+    <link id="appFavicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23059669'/%3E%3Cpath d='M32 14L14 23v3h36v-3L32 14zm-12 15v15h5V29h-5zm9.5 0v15h5V29h-5zm9.5 0v15h5V29h-5zM13 47v4h38v-4H13z' fill='%23ffffff'/%3E%3C/svg%3E">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts: Inter -->
@@ -94,9 +95,9 @@
                 <div class="absolute -left-8 -bottom-8 w-28 h-28 bg-primary-400/20 rounded-full blur-lg"></div>
                 
                 <div class="relative z-10 flex flex-col items-center">
-                    <div id="loginLogoWrapper" class="w-20 h-20 bg-white rounded-2xl shadow-lg flex items-center justify-center p-2 mb-4 overflow-hidden">
+                    <div id="loginLogoWrapper" class="w-28 h-28 sm:w-32 sm:h-32 bg-white rounded-3xl shadow-xl flex items-center justify-center p-2.5 mb-4 overflow-hidden">
                         <img id="loginLogoImg" src="" alt="Logo Koperasi" class="w-full h-full object-contain hidden">
-                        <i id="loginLogoDefault" data-lucide="landmark" class="w-10 h-10 text-primary-600"></i>
+                        <i id="loginLogoDefault" data-lucide="landmark" class="w-14 h-14 text-primary-600"></i>
                     </div>
                     <h1 id="loginCoopName" class="text-xl sm:text-2xl font-bold tracking-tight">Koperasi Sejahtera Bersama</h1>
                     <p id="loginCoopSubtitle" data-i18n="login_subtitle" class="text-primary-100 text-xs sm:text-sm mt-1">Sistem Informasi Manajemen Simpan Pinjam</p>
@@ -122,7 +123,7 @@
                         <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 text-center" data-i18n="login_pin_label">Masukkan PIN Keamanan Admin</label>
                         <input type="password" id="inputLoginPin" maxlength="8" inputmode="numeric" placeholder="••••••" required
                             class="w-full text-center text-2xl tracking-[0.5em] font-bold py-3.5 px-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all">
-                        <p class="text-center text-xs text-slate-400 mt-2">PIN Default: <span class="font-mono font-semibold text-slate-600">123456</span> (Dapat diubah di Pengaturan)</p>
+                        
                     </div>
                     <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 active:scale-[0.99] text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-primary-600/30 transition-all flex items-center justify-center gap-2">
                         <i data-lucide="log-in" class="w-5 h-5"></i>
@@ -138,7 +139,7 @@
                             <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
                                 <i data-lucide="user" class="w-4 h-4"></i>
                             </span>
-                            <input type="text" id="inputLoginUsername" placeholder="admin" required
+                            <input type="text" id="inputLoginUsername" placeholder="Masukkan username" required
                                 class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all">
                         </div>
                     </div>
@@ -151,7 +152,7 @@
                             <input type="password" id="inputLoginPassword" placeholder="••••••••" required
                                 class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all">
                         </div>
-                        <p class="text-xs text-slate-400 mt-2">Default: <span class="font-mono font-semibold text-slate-600">admin</span> / <span class="font-mono font-semibold text-slate-600">admin123</span></p>
+                        
                     </div>
                     <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 active:scale-[0.99] text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-primary-600/30 transition-all flex items-center justify-center gap-2">
                         <i data-lucide="log-in" class="w-5 h-5"></i>
@@ -175,9 +176,9 @@
             <!-- Brand Header -->
             <div class="p-5 border-b border-slate-800 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-11 h-11 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                    <div class="w-14 h-14 rounded-2xl bg-white p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-md">
                         <img id="sidebarLogoImg" src="" alt="Logo" class="w-full h-full object-contain hidden">
-                        <i id="sidebarLogoDefault" data-lucide="landmark" class="w-6 h-6 text-primary-600"></i>
+                        <i id="sidebarLogoDefault" data-lucide="landmark" class="w-8 h-8 text-primary-600"></i>
                     </div>
                     <div class="min-w-0">
                         <h2 id="sidebarCoopName" class="font-bold text-white text-sm truncate">Koperasi Sejahtera</h2>
@@ -663,17 +664,21 @@
                         
                         <form onsubmit="saveIdentitySettings(event)" class="space-y-5">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
-                                <div class="w-24 h-24 rounded-2xl bg-white border border-slate-200 flex items-center justify-center p-2 overflow-hidden shrink-0">
+                                <div class="w-32 h-32 rounded-2xl bg-white border border-slate-200 flex items-center justify-center p-2.5 overflow-hidden shrink-0 shadow-xs">
                                     <img id="previewSettingLogo" src="" alt="Preview Logo" class="w-full h-full object-contain hidden">
-                                    <i id="previewSettingLogoDefault" data-lucide="landmark" class="w-10 h-10 text-primary-600"></i>
+                                    <i id="previewSettingLogoDefault" data-lucide="landmark" class="w-14 h-14 text-primary-600"></i>
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-sm font-semibold text-slate-800">Upload Logo Koperasi (PNG/JPG)</label>
                                     <input type="file" id="inputLogoFile" accept="image/*" onchange="handleLogoUpload(event)"
                                         class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer">
-                                    <div class="flex items-center gap-3">
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <button type="button" onclick="downloadCoopLogo()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all">
+                                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                            <span>Download Logo Koperasi</span>
+                                        </button>
                                         <button type="button" onclick="removeCustomLogo()" class="text-xs text-rose-600 hover:underline font-medium">Hapus Logo Kustom</button>
-                                        <span class="text-[11px] text-slate-400">Maksimal ukuran disarankan 500KB</span>
+                                        <span class="text-[11px] text-slate-400">Otomatis tersimpan &amp; jadi ikon tab</span>
                                     </div>
                                 </div>
                             </div>
@@ -1256,6 +1261,8 @@
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyGjqgMtwgihZ9BP93_6GmejWQZQcCYLS5-Y2TvX0Dgdd3h35ijujj0ce_oqvhNtBaZZg/exec";
         const SYNC_INTERVAL_MS = 15000; // Polling otomatis tiap 15 detik
         let isSyncing = false;
+        let isPushing = false;
+        let lastLocalMutationAt = 0;
         let lastStateHash = "";
 
         function updateSyncBadge(status, text) {
@@ -1291,7 +1298,9 @@
         }
 
         async function pullFromGoogleSheets(silent = false) {
-            if (!GAS_WEB_APP_URL || isSyncing) return;
+            if (!GAS_WEB_APP_URL || isSyncing || isPushing) return;
+            // Jangan timpa perubahan lokal yang baru saja dilakukan dalam 10 detik terakhir
+            if (silent && (Date.now() - lastLocalMutationAt < 10000)) return;
 
             isSyncing = true;
             if (!silent) updateSyncBadge('syncing', 'Sinkronisasi...');
@@ -1301,12 +1310,20 @@
                 const json = await res.json();
 
                 if (json.status === 'success' && json.data) {
+                    // Cek ulang jika user baru saja mengubah data selama fetch berlangsung
+                    if (isPushing || (silent && (Date.now() - lastLocalMutationAt < 10000))) {
+                        return;
+                    }
                     const incomingHash = JSON.stringify(json.data);
                     if (incomingHash !== lastStateHash) {
                         json.data.dictionary = { ...DEFAULT_DICTIONARY, ...(json.data.dictionary || {}) };
+                        // Pertahankan logo lokal jika di server kosong akibat limit sel Sheets lama
+                        if (!json.data.config?.logoBase64 && appState.config?.logoBase64 && (Date.now() - lastLocalMutationAt < 30000)) {
+                            json.data.config.logoBase64 = appState.config.logoBase64;
+                        }
                         appState = json.data;
-                        lastStateHash = incomingHash;
-                        localStorage.setItem(STORAGE_KEY, incomingHash);
+                        lastStateHash = JSON.stringify(appState);
+                        localStorage.setItem(STORAGE_KEY, lastStateHash);
                         refreshAllViews();
                         if (!silent) showToast("Data berhasil disinkronkan dari Google Sheets!");
                     }
@@ -1328,6 +1345,7 @@
         async function pushToGoogleSheets(stateData) {
             if (!GAS_WEB_APP_URL) return;
 
+            isPushing = true;
             updateSyncBadge('syncing', 'Menyimpan...');
             try {
                 const payloadStr = JSON.stringify(stateData);
@@ -1346,11 +1364,14 @@
                 console.error("Gagal simpan ke Google Sheets:", err);
                 updateSyncBadge('offline', 'Gagal Sync');
                 showToast("Tersimpan di perangkat, gagal kirim ke Google Sheets.", "error");
+            } finally {
+                isPushing = false;
             }
         }
 
         function saveState(stateToSave = appState) {
             try {
+                lastLocalMutationAt = Date.now();
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
                 pushToGoogleSheets(stateToSave);
             } catch (e) {
@@ -1447,6 +1468,31 @@
                     defEl.classList.remove('hidden');
                 }
             });
+
+            syncFaviconWithLogo(logoBase64);
+        }
+
+        function getDefaultCoopFaviconDataUrl() {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#059669"/><path d="M32 14L14 23v3h36v-3L32 14zm-12 15v15h5V29h-5zm9.5 0v15h5V29h-5zm9.5 0v15h5V29h-5zM13 47v4h38v-4H13z" fill="#ffffff"/></svg>`;
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        }
+
+        function syncFaviconWithLogo(logoBase64) {
+            let linkEl = document.getElementById('appFavicon');
+            if (!linkEl) {
+                linkEl = document.createElement('link');
+                linkEl.id = 'appFavicon';
+                linkEl.rel = 'icon';
+                document.head.appendChild(linkEl);
+            }
+            if (logoBase64 && logoBase64.startsWith('data:image')) {
+                const mimeMatch = logoBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+                linkEl.type = mimeMatch ? mimeMatch[1] : 'image/png';
+                linkEl.href = logoBase64;
+            } else {
+                linkEl.type = 'image/svg+xml';
+                linkEl.href = getDefaultCoopFaviconDataUrl();
+            }
         }
 
         // 5. LOGIKA LOGIN & SESSION
@@ -2227,21 +2273,105 @@
             document.getElementById('setAdminPassword').value = appState.config.adminPassword;
         }
 
-        function handleLogoUpload(e) {
+        function compressLogoImage(file, maxSize = 200) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > maxSize) {
+                                height = Math.round((height * maxSize) / width);
+                                width = maxSize;
+                            }
+                        } else {
+                            if (height > maxSize) {
+                                width = Math.round((width * maxSize) / height);
+                                height = maxSize;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, width, height);
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Gunakan PNG jika transparan atau WebP/JPEG terkompresi agar ukuran < 25KB (aman untuk limit 50.000 karakter sel Google Sheets)
+                        let dataUrl = canvas.toDataURL('image/webp', 0.82);
+                        if (!dataUrl.startsWith('data:image/webp') || dataUrl.length > 30000) {
+                            dataUrl = canvas.toDataURL('image/png');
+                        }
+                        if (dataUrl.length > 35000) {
+                            dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                        }
+                        resolve(dataUrl);
+                    };
+                    img.onerror = reject;
+                    img.src = evt.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handleLogoUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > 1024 * 1024) {
-                showToast("Ukuran gambar terlalu besar (Maks 1MB).", "error");
+            if (file.size > 5 * 1024 * 1024) {
+                showToast("Ukuran file gambar terlalu besar (Maks 5MB).", "error");
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                appState.config.logoBase64 = evt.target.result;
+            try {
+                const compressedBase64 = await compressLogoImage(file, 320);
+                appState.config.logoBase64 = compressedBase64;
                 saveState();
                 applyBrandingToUI();
-                showToast("Logo koperasi berhasil diperbarui!");
-            };
-            reader.readAsDataURL(file);
+                showToast("Logo koperasi berhasil diperbarui & tersimpan permanen!");
+            } catch (err) {
+                console.error("Gagal memproses logo:", err);
+                showToast("Gagal memproses file gambar logo.", "error");
+            }
+        }
+
+
+        function downloadCoopLogo() {
+            const safeName = (appState.config.coopName || 'Koperasi')
+                .replace(/[^a-zA-Z0-9_-]+/g, '_')
+                .replace(/^_+|_+$/g, '') || 'Koperasi';
+
+            const logoSrc = appState.config.logoBase64;
+            if (logoSrc && logoSrc.startsWith('data:image')) {
+                const mimeMatch = logoSrc.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,/);
+                let ext = mimeMatch ? mimeMatch[1].toLowerCase() : 'png';
+                if (ext === 'jpeg') ext = 'jpg';
+                if (ext === 'svg+xml') ext = 'svg';
+
+                const a = document.createElement('a');
+                a.href = logoSrc;
+                a.download = `Logo_${safeName}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showToast(`Logo koperasi (${a.download}) berhasil diunduh!`);
+            } else {
+                const svgBlob = new Blob([
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#059669"/><path d="M32 14L14 23v3h36v-3L32 14zm-12 15v15h5V29h-5zm9.5 0v15h5V29h-5zm9.5 0v15h5V29h-5zM13 47v4h38v-4H13z" fill="#ffffff"/></svg>`
+                ], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Logo_${safeName}.svg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast(`Logo default koperasi (${a.download}) berhasil diunduh!`);
+            }
         }
 
         function removeCustomLogo() {
@@ -2254,12 +2384,16 @@
 
         function saveIdentitySettings(e) {
             e.preventDefault();
+            const previewImg = document.getElementById('previewSettingLogo');
+            if (previewImg && !previewImg.classList.contains('hidden') && previewImg.src && previewImg.src.startsWith('data:image')) {
+                appState.config.logoBase64 = previewImg.src;
+            }
             appState.config.coopName = document.getElementById('setCoopName').value.trim();
             appState.config.coopLegal = document.getElementById('setCoopLegal').value.trim();
             appState.config.coopAddress = document.getElementById('setCoopAddress').value.trim();
             saveState();
             applyBrandingToUI();
-            showToast("Identitas koperasi berhasil disimpan!");
+            showToast("Identitas & logo koperasi berhasil disimpan!");
         }
 
         function saveSecuritySettings(e) {
@@ -2377,7 +2511,7 @@
         function printReport(section) {
             const printArea = document.getElementById('printArea');
             const logoHtml = appState.config.logoBase64
-                ? `<img src="${appState.config.logoBase64}" style="width:64px;height:64px;object-fit:contain;">`
+                ? `<img src="${appState.config.logoBase64}" style="width:92px;height:92px;object-fit:contain;">`
                 : '';
 
             let title = "";
@@ -2569,3 +2703,4 @@
     </script>
 </body>
 </html>
+Analyzing
