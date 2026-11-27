@@ -1185,6 +1185,31 @@
         const STORAGE_KEY = 'ksp_app_database_v1';
         const SESSION_KEY = 'ksp_is_logged_in';
 
+        function normalizeState(rawState) {
+            const base = getInitialState();
+            const merged = {
+                ...base,
+                ...(rawState || {}),
+                config: { ...base.config, ...((rawState && rawState.config) || {}) },
+                dictionary: { ...DEFAULT_DICTIONARY, ...((rawState && rawState.dictionary) || {}) },
+                members: Array.isArray(rawState && rawState.members) ? rawState.members : base.members,
+                savings: Array.isArray(rawState && rawState.savings) ? rawState.savings : base.savings,
+                loans: Array.isArray(rawState && rawState.loans) ? rawState.loans.map(l => ({
+                    ...l,
+                    principal: Number(l.principal || 0),
+                    interestRate: Number(l.interestRate || 0),
+                    totalAmount: Number(l.totalAmount || 0),
+                    paidAmount: Number(l.paidAmount || 0),
+                    tenor: Math.max(1, Number(l.tenor || 1))
+                })) : base.loans,
+                cashflows: Array.isArray(rawState && rawState.cashflows) ? rawState.cashflows.map(cf => ({
+                    ...cf,
+                    amount: Number(cf.amount || 0)
+                })) : base.cashflows
+            };
+            return merged;
+        }
+
         function getInitialState() {
             const today = new Date().toISOString().split('T')[0];
             const currentMonth = today.slice(0, 7);
@@ -1243,9 +1268,7 @@
                 const raw = localStorage.getItem(STORAGE_KEY);
                 if (raw) {
                     const parsed = JSON.parse(raw);
-                    // Gabungkan kamus default jika ada key baru
-                    parsed.dictionary = { ...DEFAULT_DICTIONARY, ...(parsed.dictionary || {}) };
-                    return parsed;
+                    return normalizeState(parsed);
                 }
             } catch (e) {
                 console.error("Gagal membaca storage:", e);
@@ -1262,8 +1285,10 @@
         const SYNC_INTERVAL_MS = 15000; // Polling otomatis tiap 15 detik
         let isSyncing = false;
         let isPushing = false;
+        let hasPendingPush = false;
         let lastLocalMutationAt = 0;
-        let lastStateHash = "";
+        let lastSyncedServerHash = "";
+        let retryPushTimer = null;
 
         function updateSyncBadge(status, text) {
             let badge = document.getElementById('cloudSyncBadge');
@@ -1298,9 +1323,9 @@
         }
 
         async function pullFromGoogleSheets(silent = false) {
-            if (!GAS_WEB_APP_URL || isSyncing || isPushing) return;
-            // Jangan timpa perubahan lokal yang baru saja dilakukan dalam 10 detik terakhir
-            if (silent && (Date.now() - lastLocalMutationAt < 10000)) return;
+            if (!GAS_WEB_APP_URL || isSyncing || isPushing || hasPendingPush) return;
+            // Jangan timpa perubahan lokal yang baru saja dilakukan dalam 15 detik terakhir
+            if (silent && (Date.now() - lastLocalMutationAt < 15000)) return;
 
             isSyncing = true;
             if (!silent) updateSyncBadge('syncing', 'Sinkronisasi...');
@@ -1310,22 +1335,32 @@
                 const json = await res.json();
 
                 if (json.status === 'success' && json.data) {
-                    // Cek ulang jika user baru saja mengubah data selama fetch berlangsung
-                    if (isPushing || (silent && (Date.now() - lastLocalMutationAt < 10000))) {
+                    if (isPushing || hasPendingPush || (silent && (Date.now() - lastLocalMutationAt < 15000))) {
                         return;
                     }
-                    const incomingHash = JSON.stringify(json.data);
-                    if (incomingHash !== lastStateHash) {
-                        json.data.dictionary = { ...DEFAULT_DICTIONARY, ...(json.data.dictionary || {}) };
-                        // Pertahankan logo lokal jika di server kosong akibat limit sel Sheets lama
-                        if (!json.data.config?.logoBase64 && appState.config?.logoBase64 && (Date.now() - lastLocalMutationAt < 30000)) {
-                            json.data.config.logoBase64 = appState.config.logoBase64;
+                    const normalizedIncoming = normalizeState(json.data);
+                    // Pertahankan logo lokal jika di server kosong akibat limit sel Sheets lama
+                    if (!normalizedIncoming.config?.logoBase64 && appState.config?.logoBase64 && (Date.now() - lastLocalMutationAt < 30000)) {
+                        normalizedIncoming.config.logoBase64 = appState.config.logoBase64;
+                    }
+                    const incomingHash = JSON.stringify(normalizedIncoming);
+                    const currentHash = JSON.stringify(appState);
+
+                    if (incomingHash !== currentHash && incomingHash !== lastSyncedServerHash) {
+                        // Pastikan tidak membuang pinjaman lokal yang lebih baru jika server sempat tertinggal
+                        const localLoanIds = new Set((appState.loans || []).map(x => x.id));
+                        const serverLoanIds = new Set((normalizedIncoming.loans || []).map(x => x.id));
+                        const hasNewerLocalLoan = [...localLoanIds].some(id => !serverLoanIds.has(id) && (Date.now() - lastLocalMutationAt < 60000));
+
+                        if (!hasNewerLocalLoan) {
+                            appState = normalizedIncoming;
+                            lastSyncedServerHash = incomingHash;
+                            localStorage.setItem(STORAGE_KEY, currentHash = incomingHash);
+                            refreshAllViews();
+                            if (!silent) showToast("Data berhasil disinkronkan dari Google Sheets!");
                         }
-                        appState = json.data;
-                        lastStateHash = JSON.stringify(appState);
-                        localStorage.setItem(STORAGE_KEY, lastStateHash);
-                        refreshAllViews();
-                        if (!silent) showToast("Data berhasil disinkronkan dari Google Sheets!");
+                    } else {
+                        lastSyncedServerHash = incomingHash;
                     }
                     updateSyncBadge('online', 'Live Sheets');
                 } else if (json.status === 'empty') {
@@ -1345,35 +1380,65 @@
         async function pushToGoogleSheets(stateData) {
             if (!GAS_WEB_APP_URL) return;
 
-            isPushing = true;
-            updateSyncBadge('syncing', 'Menyimpan...');
-            try {
-                const payloadStr = JSON.stringify(stateData);
-                lastStateHash = payloadStr;
+            if (isPushing) {
+                hasPendingPush = true;
+                return;
+            }
 
+            isPushing = true;
+            hasPendingPush = true;
+            updateSyncBadge('syncing', 'Menyimpan...');
+
+            const snapshot = normalizeState(JSON.parse(JSON.stringify(stateData)));
+            const payloadStr = JSON.stringify(snapshot);
+
+            try {
                 const res = await fetch(GAS_WEB_APP_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ state: stateData })
+                    body: JSON.stringify({ state: snapshot })
                 });
                 const json = await res.json();
                 if (json.status === 'error') throw new Error(json.message);
 
+                lastSyncedServerHash = payloadStr;
+                // Hanya lepas tanda pending jika tidak ada mutasi baru saat proses POST berlangsung
+                if (JSON.stringify(appState) === payloadStr) {
+                    hasPendingPush = false;
+                }
+                if (retryPushTimer) {
+                    clearTimeout(retryPushTimer);
+                    retryPushTimer = null;
+                }
                 updateSyncBadge('online', 'Live Sheets');
             } catch (err) {
                 console.error("Gagal simpan ke Google Sheets:", err);
-                updateSyncBadge('offline', 'Gagal Sync');
-                showToast("Tersimpan di perangkat, gagal kirim ke Google Sheets.", "error");
+                hasPendingPush = true;
+                updateSyncBadge('offline', 'Antre Sync');
+                // Coba kirim ulang otomatis setelah 5 detik agar data tidak hilang
+                if (!retryPushTimer) {
+                    retryPushTimer = setTimeout(() => {
+                        retryPushTimer = null;
+                        if (hasPendingPush) {
+                            pushToGoogleSheets(appState);
+                        }
+                    }, 5000);
+                }
             } finally {
                 isPushing = false;
+                if (hasPendingPush && !retryPushTimer) {
+                    pushToGoogleSheets(appState);
+                }
             }
         }
 
         function saveState(stateToSave = appState) {
             try {
+                appState = normalizeState(stateToSave);
                 lastLocalMutationAt = Date.now();
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-                pushToGoogleSheets(stateToSave);
+                hasPendingPush = true;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+                pushToGoogleSheets(appState);
             } catch (e) {
                 showToast("Penyimpanan penuh! Coba gunakan logo dengan ukuran lebih kecil.", "error");
             }
@@ -1605,17 +1670,17 @@
             let totalIn = 0;
             let totalOut = 0;
             appState.cashflows.forEach(cf => {
-                if (cf.type === 'in') totalIn += Number(cf.amount);
-                else totalOut += Number(cf.amount);
+                if (cf.type === 'in') totalIn += Number(cf.amount || 0);
+                else totalOut += Number(cf.amount || 0);
             });
             const cashBalance = totalIn - totalOut;
 
-            const totalSavings = appState.savings.reduce((sum, s) => sum + Number(s.amount), 0);
+            const totalSavings = appState.savings.reduce((sum, s) => sum + Number(s.amount || 0), 0);
             
             let activeLoansRemaining = 0;
             let activeLoansCount = 0;
             appState.loans.forEach(l => {
-                const rem = Number(l.totalAmount) - Number(l.paidAmount);
+                const rem = Math.max(0, Number(l.totalAmount || 0) - Number(l.paidAmount || 0));
                 if (rem > 0) {
                     activeLoansRemaining += rem;
                     activeLoansCount++;
@@ -1693,11 +1758,11 @@
             tbody.innerHTML = filtered.map(m => {
                 const memberSavings = appState.savings
                     .filter(s => s.memberId === m.id)
-                    .reduce((acc, cur) => acc + Number(cur.amount), 0);
+                    .reduce((acc, cur) => acc + Number(cur.amount || 0), 0);
 
                 const memberLoanRem = appState.loans
                     .filter(l => l.memberId === m.id)
-                    .reduce((acc, cur) => acc + Math.max(0, Number(cur.totalAmount) - Number(cur.paidAmount)), 0);
+                    .reduce((acc, cur) => acc + Math.max(0, Number(cur.totalAmount || 0) - Number(cur.paidAmount || 0)), 0);
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition-colors">
@@ -1779,7 +1844,7 @@
                 if (idx !== -1) appState.members[idx] = { ...appState.members[idx], ...payload };
                 showToast("Data anggota berhasil diperbarui.");
             } else {
-                appState.members.push({ id: 'm_' + Date.now(), ...payload });
+                appState.members.push({ id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), ...payload });
                 showToast("Anggota baru berhasil ditambahkan.");
             }
 
@@ -1846,7 +1911,8 @@
             const month = document.getElementById('savingMonth').value;
             const amount = Number(document.getElementById('savingAmount').value);
             const note = document.getElementById('savingNote').value.trim() || `Simpanan Wajib Periode ${month}`;
-            const savingId = 's_' + Date.now();
+            const uid = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            const savingId = 's_' + uid;
 
             appState.savings.push({
                 id: savingId,
@@ -1859,7 +1925,7 @@
 
             // Otomatis masuk ke Buku Kas (Uang Masuk)
             appState.cashflows.push({
-                id: 'cf_' + Date.now(),
+                id: 'cf_' + uid,
                 date,
                 type: 'in',
                 category: t('menu_savings'),
@@ -1957,15 +2023,19 @@
             e.preventDefault();
             const memberId = document.getElementById('loanMemberId').value;
             const member = appState.members.find(m => m.id === memberId);
-            if (!member) return;
+            if (!member) {
+                showToast("Pilih anggota peminjam terlebih dahulu!", "error");
+                return;
+            }
 
-            const principal = Number(document.getElementById('loanPrincipal').value);
-            const interestRate = Number(document.getElementById('loanInterest').value);
-            const tenor = Number(document.getElementById('loanTenor').value);
-            const date = document.getElementById('loanDate').value;
-            const dueDate = document.getElementById('loanDueDate').value;
+            const principal = Number(document.getElementById('loanPrincipal').value || 0);
+            const interestRate = Number(document.getElementById('loanInterest').value || 0);
+            const tenor = Math.max(1, Number(document.getElementById('loanTenor').value || 1));
+            const date = document.getElementById('loanDate').value || new Date().toISOString().split('T')[0];
+            const dueDate = document.getElementById('loanDueDate').value || date;
             const totalAmount = principal + (principal * (interestRate / 100));
-            const loanId = 'l_' + Date.now();
+            const uid = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            const loanId = 'l_' + uid;
 
             appState.loans.push({
                 id: loanId,
@@ -1982,7 +2052,7 @@
 
             // Pencairan pinjaman = Uang Keluar dari Kas
             appState.cashflows.push({
-                id: 'cf_' + Date.now(),
+                id: 'cf_' + uid,
                 date,
                 type: 'out',
                 category: 'Pencairan Pinjaman',
@@ -2002,7 +2072,7 @@
             const tbody = document.getElementById('loansTableBody');
 
             const filtered = appState.loans.filter(l => {
-                const rem = Number(l.totalAmount) - Number(l.paidAmount);
+                const rem = Math.max(0, Number(l.totalAmount || 0) - Number(l.paidAmount || 0));
                 const isPaid = rem <= 0;
                 if (filterStatus === 'active') return !isPaid;
                 if (filterStatus === 'paid') return isPaid;
@@ -2017,7 +2087,7 @@
             tbody.innerHTML = filtered.map(l => {
                 const member = appState.members.find(m => m.id === l.memberId);
                 const memberName = member ? `${member.name} (${member.code})` : 'Anggota Terhapus';
-                const remaining = Math.max(0, Number(l.totalAmount) - Number(l.paidAmount));
+                const remaining = Math.max(0, Number(l.totalAmount || 0) - Number(l.paidAmount || 0));
                 const isPaid = remaining <= 0;
 
                 return `
@@ -2063,8 +2133,8 @@
             const loan = appState.loans.find(l => l.id === loanId);
             if (!loan) return;
             const member = appState.members.find(m => m.id === loan.memberId);
-            const remaining = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
-            const suggested = Math.min(remaining, Math.ceil(loan.totalAmount / loan.tenor));
+            const remaining = Math.max(0, Number(loan.totalAmount || 0) - Number(loan.paidAmount || 0));
+            const suggested = Math.min(remaining, Math.ceil(Number(loan.totalAmount || 0) / Math.max(1, Number(loan.tenor || 1))));
 
             document.getElementById('instLoanId').value = loan.id;
             document.getElementById('instMemberName').textContent = member ? `${member.name} (${member.code})` : 'Anggota';
@@ -2086,18 +2156,18 @@
 
             const member = appState.members.find(m => m.id === loan.memberId);
             const date = document.getElementById('instDate').value;
-            const amount = Number(document.getElementById('instAmount').value);
+            const amount = Number(document.getElementById('instAmount').value || 0);
             const note = document.getElementById('instNote').value.trim();
 
-            loan.paidAmount = Number(loan.paidAmount) + amount;
-            if (loan.paidAmount >= loan.totalAmount) {
-                loan.paidAmount = loan.totalAmount;
+            loan.paidAmount = Number(loan.paidAmount || 0) + amount;
+            if (loan.paidAmount >= Number(loan.totalAmount || 0)) {
+                loan.paidAmount = Number(loan.totalAmount || 0);
                 loan.status = 'paid';
             }
 
             // Otomatis Uang Masuk ke Kas
             appState.cashflows.push({
-                id: 'cf_' + Date.now(),
+                id: 'cf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
                 date,
                 type: 'in',
                 category: 'Angsuran Pinjaman',
@@ -2140,11 +2210,11 @@
             const type = document.querySelector('input[name="cfType"]:checked').value;
             const date = document.getElementById('cfDate').value;
             const category = document.getElementById('cfCategory').value;
-            const amount = Number(document.getElementById('cfAmount').value);
+            const amount = Number(document.getElementById('cfAmount').value || 0);
             const desc = document.getElementById('cfDesc').value.trim();
 
             appState.cashflows.push({
-                id: 'cf_' + Date.now(),
+                id: 'cf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
                 date,
                 type,
                 category,
@@ -2179,8 +2249,8 @@
             let sumIn = 0;
             let sumOut = 0;
             list.forEach(cf => {
-                if (cf.type === 'in') sumIn += Number(cf.amount);
-                else sumOut += Number(cf.amount);
+                if (cf.type === 'in') sumIn += Number(cf.amount || 0);
+                else sumOut += Number(cf.amount || 0);
             });
 
             document.getElementById('cfSummaryIn').textContent = formatRupiah(sumIn);
@@ -2251,7 +2321,7 @@
             showToast("File CSV berhasil diunduh.");
         }
 
-        // 12. PENGATURAN (LOGO, KREDENSIAL, kamus, BACKUP)
+        // 12. PENGATURAN (LOGO, KREDENSIAL, KAMUS, BACKUP)
         function switchSettingsTab(tab) {
             document.querySelectorAll('.set-panel').forEach(p => p.classList.add('hidden'));
             document.getElementById(`setPanel-${tab}`).classList.remove('hidden');
@@ -2301,7 +2371,6 @@
                         ctx.clearRect(0, 0, width, height);
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // Gunakan PNG jika transparan atau WebP/JPEG terkompresi agar ukuran < 25KB (aman untuk limit 50.000 karakter sel Google Sheets)
                         let dataUrl = canvas.toDataURL('image/webp', 0.82);
                         if (!dataUrl.startsWith('data:image/webp') || dataUrl.length > 30000) {
                             dataUrl = canvas.toDataURL('image/png');
@@ -2337,7 +2406,6 @@
                 showToast("Gagal memproses file gambar logo.", "error");
             }
         }
-
 
         function downloadCoopLogo() {
             const safeName = (appState.config.coopName || 'Koperasi')
@@ -2489,7 +2557,7 @@
                     if (!imported.config || !imported.members || !imported.cashflows) {
                         throw new Error("Format file tidak valid");
                     }
-                    appState = imported;
+                    appState = normalizeState(imported);
                     saveState();
                     refreshAllViews();
                     showToast("Data koperasi berhasil dipulihkan dari backup!");
@@ -2522,8 +2590,8 @@
                 const list = getFilteredCashflows();
                 let tIn = 0, tOut = 0;
                 const rows = list.map((cf, i) => {
-                    if (cf.type === 'in') tIn += Number(cf.amount);
-                    else tOut += Number(cf.amount);
+                    if (cf.type === 'in') tIn += Number(cf.amount || 0);
+                    else tOut += Number(cf.amount || 0);
                     return `
                         <tr>
                             <td style="border:1px solid #cbd5e1;padding:6px;">${i + 1}</td>
@@ -2563,7 +2631,7 @@
                 let total = 0;
                 const rows = appState.savings.map((s, i) => {
                     const m = appState.members.find(x => x.id === s.memberId);
-                    total += Number(s.amount);
+                    total += Number(s.amount || 0);
                     return `
                         <tr>
                             <td style="border:1px solid #cbd5e1;padding:6px;">${i + 1}</td>
@@ -2598,7 +2666,7 @@
                 title = `LAPORAN ${t('menu_loans').toUpperCase()}`;
                 const rows = appState.loans.map((l, i) => {
                     const m = appState.members.find(x => x.id === l.memberId);
-                    const rem = Math.max(0, Number(l.totalAmount) - Number(l.paidAmount));
+                    const rem = Math.max(0, Number(l.totalAmount || 0) - Number(l.paidAmount || 0));
                     return `
                         <tr>
                             <td style="border:1px solid #cbd5e1;padding:6px;">${i + 1}</td>
@@ -2672,7 +2740,7 @@
                 weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
             });
 
-            lastStateHash = JSON.stringify(appState);
+            lastSyncedServerHash = JSON.stringify(appState);
             applyBrandingToUI();
             applyDictionaryToUI();
 
@@ -2695,7 +2763,7 @@
                                      !document.getElementById('loanModal').classList.contains('hidden') ||
                                      !document.getElementById('installmentModal').classList.contains('hidden') ||
                                      !document.getElementById('cashflowModal').classList.contains('hidden');
-                if (!anyModalOpen) {
+                if (!anyModalOpen && !hasPendingPush && !isPushing) {
                     pullFromGoogleSheets(true);
                 }
             }, SYNC_INTERVAL_MS);
@@ -2703,4 +2771,3 @@
     </script>
 </body>
 </html>
-Analyzing
